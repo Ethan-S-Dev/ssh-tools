@@ -1,26 +1,23 @@
-from dev import getCommand,CommandError
-import os
+from dev import get_command,CommandError,config,help
 import sys
-from os import path
-from paramiko import SSHClient, AutoAddPolicy, client
 from rich import print
-
-client = SSHClient()
-client.load_host_keys("~/.ssh/known_hosts")
-
-def loadConfig():
-    if path.exists("config.json"):
-        print("config file exists!")
-
-
-def main(argc:str,argv:list[str]):
+        
+def main(args):
     try:
-        getCommand(argc)(*argv)
+        config()
+        if len(args) <= 1:
+            help()
+            return
+        argc = args[1]
+        if(len(args) == 2):
+            get_command(argc)
+            return
+        argv = args[2:]
+        get_command(argc)(*argv)
     except CommandError as err:
         print(err)
-
-    
-
+    except Exception as wtf:
+        print(wtf)
 
 if __name__ == "__main__":
-    main(sys.argv[1],sys.argv[2:])
+    main(sys.argv)
