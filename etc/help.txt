@@ -1,5 +1,5 @@
-usage: ssh-tools [--help] <command> [<args>]
+usage: ssht [--help] <command> [<args>]
 
 These are common SSH_Tools commands used in various situations:
 
-    add             Add a new ssh 
+    add             Add a new ssh session.

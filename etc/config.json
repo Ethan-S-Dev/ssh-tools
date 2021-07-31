@@ -1,3 +1,4 @@
 {
+    "UseSysHostKey": true,
     "AutoAddPolicy": true
 }
