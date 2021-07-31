@@ -12,11 +12,12 @@ class CommandResult:
         self.stderr_text = stdin
 
 class SessionInfo:
-    def __init__(self,ip:str,port:int,username,password:str=None) -> None:
+    def __init__(self,ip:str,port:int,username,password:str=None,command:str=None) -> None:
         self.server_ip = ip
         self.server_port = port
         self.username = username
         self.password = password
+        self.command = command
 
 class Session:
     use_sys_host_key = False
@@ -98,16 +99,19 @@ class Client:
             del session
             self.connection_table.rows.pop(session_id)
            
-    def exec_command(self,command:str,session_ids:list[int]=None):
+    def exec_command(self,command:str=None,session_ids:list[int]=None):
         self.results_table.rows.clear()
-        if session_ids is None:
+        if session_ids is None or len(session_ids) == 0:
             session_ids = self.sessions.keys()
-        
-        results = {session_id:session.exec_command(command) for session_id,session in self.sessions.items() if session_id in session_ids}
+        if command is None:
+            results = {session_id:session.exec_command(self.connections[session_id].command) for session_id,session in self.sessions.items() if session_id in session_ids and self.connections[session_id].command is not None}
+        else:
+            results = {session_id:session.exec_command(command) for session_id,session in self.sessions.items() if session_id in session_ids}
         for id,result in results.items():
             session_info = self.connections.get(id) 
             self.results_table.add_row(f"{session_info.server_ip}:{session_info.server_port}","[green]Completed[/]" if len(result.stderr_text) == 0 else "[red]Error[/]",f"{result.stdout_text}" if len(result.stderr_text) == 0 else f"{result.stderr_text}")
-            
+        return results
+    
     def print_connections(self):
         console.print(self.connection_table)
     

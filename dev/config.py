@@ -1,5 +1,4 @@
 from ssh_sessions import Session
-from paramiko import AutoAddPolicy
 
 import json
 from os import path

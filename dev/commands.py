@@ -1,12 +1,14 @@
-from dev import ssh_sessions
-from dev.ssh_sessions import Client
+from dev.commands.ssh_command import SSHCommand
+from dev import console
 from .exceptions import CommandError
-from dev import ssh_command
+
+def ssh_command(*args):
+    SSHCommand().start(list(args))
 
 def help(command:str=None):
     if not command:
         with open("etc/help.txt") as helpText:
-            print(helpText.read())
+            console.print(helpText.read())
         return
     print(command)
 
