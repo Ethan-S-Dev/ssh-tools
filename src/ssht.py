@@ -1,4 +1,7 @@
-from dev import get_command,CommandError,config,console
+from commands import get_command
+from util import CommandError
+from configuration import config
+from entities import console
 import sys
     
 def main(args):

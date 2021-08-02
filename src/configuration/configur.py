@@ -1,5 +1,4 @@
-from ssh_sessions import Session
-
+from models import Session
 import json
 from os import path
 

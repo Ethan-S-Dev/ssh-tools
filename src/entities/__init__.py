@@ -1,0 +1,1 @@
+from .cons import console

@@ -1,9 +1,8 @@
-from colorama.initialise import init
 from paramiko import SSHClient ,AutoAddPolicy
 from paramiko.ssh_exception import BadHostKeyException, AuthenticationException, SSHException
 from rich.table import Table
-from .console import console
-from .exceptions import ConnectionError
+from entities import console
+from util import ConnectionError
 
 class CommandResult:
     def __init__(self,stdin:str,stdout:str,stderr:str) -> None:

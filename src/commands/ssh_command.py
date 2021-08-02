@@ -1,19 +1,12 @@
-from dev.ssh_sessions import Client, CommandResult, Session, SessionInfo
-from dev.exceptions import CommandError, FileError
+from models import Client, CommandResult, SessionInfo
+from util import CommandError
 from typing import Callable, Tuple
-import magic
-import os.path as path
-from dev.file_readers import read_json,read_excel,read_csv
-from dev import console
+from util import read_file
+from entities import console
 from rich.table import Table
 
 class SSHCommand():
-    mimes:dict[str,Callable[[str],list]] = {
-    "application/json":read_json,
-    "text/csv":read_csv,
-    "application/vnd.ms-excel":read_excel,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":read_excel
-    }
+    
 
     def __init__(self) -> None:
         self.argv:dict[str,Callable] = {
@@ -31,11 +24,7 @@ class SSHCommand():
         self.first_command = None
 
     def __connections_from_file(self,file_path:str):
-        if path.exists(file_path):
-            file_mime = magic.from_file(file_path,mime=True)
-            if file_mime not in SSHCommand.mimes:
-                raise FileError(f"The file: '{file_path}' is not supported.")
-            conn_list = SSHCommand.mimes[file_mime](file_path)
+            conn_list = read_file(file_path)
             self.client = Client([SessionInfo(*args) for args in conn_list])
             self.next_id = len(self.client.connections)
     

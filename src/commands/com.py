@@ -1,6 +1,6 @@
-from dev.commands.ssh_command import SSHCommand
-from dev import console
-from .exceptions import CommandError
+from entities import console
+from .ssh_command import SSHCommand
+from util import CommandError
 
 def ssh_command(*args):
     SSHCommand().start(list(args))
