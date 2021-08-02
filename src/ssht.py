@@ -1,7 +1,7 @@
 from commands import get_command
 from util import CommandError
 from configuration import config
-from entities import console
+from common import console
 import sys
     
 def main(args):

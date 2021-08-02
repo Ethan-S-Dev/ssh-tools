@@ -1,7 +1,7 @@
 from paramiko import SSHClient ,AutoAddPolicy
-from paramiko.ssh_exception import BadHostKeyException, AuthenticationException, SSHException
+from paramiko.ssh_exception import BadHostKeyException, AuthenticationException, SSHException,NoValidConnectionsError
 from rich.table import Table
-from entities import console
+from common import console
 from util import ConnectionError
 
 class CommandResult:
@@ -35,6 +35,8 @@ class Session:
             raise ConnectionError("Authentication failed, Check your username and password.")
         except SSHException as err:
             raise ConnectionError(f"Failed to connect to the server at {ip}:{port}.")
+        except Exception as err:
+             raise ConnectionError(f"Failed to connect to the server at {ip}:{port}.")
 
     def __del__(self):
         self.ssh_client.close()

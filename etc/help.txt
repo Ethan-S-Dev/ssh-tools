@@ -2,4 +2,4 @@ usage: ssht [--help] <command> [<args>]
 
 These are common SSH_Tools commands used in various situations:
 
-    add             Add a new ssh session.
+    ssh             Opens an ssh connection or connections to remote distentions.

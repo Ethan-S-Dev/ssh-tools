@@ -1,4 +1,4 @@
-from entities import console
+from common import console,help_path
 from .ssh_command import SSHCommand
 from util import CommandError
 
@@ -7,7 +7,7 @@ def ssh_command(*args):
 
 def help(command:str=None):
     if not command:
-        with open("etc/help.txt") as helpText:
+        with open(help_path) as helpText:
             console.print(helpText.read())
         return
     print(command)

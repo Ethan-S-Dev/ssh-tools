@@ -2,7 +2,7 @@ from models import Client, CommandResult, SessionInfo
 from util import CommandError
 from typing import Callable, Tuple
 from util import read_file
-from entities import console
+from common import console
 from rich.table import Table
 
 class SSHCommand():
@@ -16,7 +16,7 @@ class SSHCommand():
         self.commands:dict[str,Tuple[Callable,int,int]] = {
             "add":(self.__add_connection,2,4),
             "exec":(self.__exec,0,2),
-            "history":(self.__print_result,1,1)
+            "history":(self.__get_result_table,1,1)
         }
         self.next_id = 0
         self.client = Client([])
