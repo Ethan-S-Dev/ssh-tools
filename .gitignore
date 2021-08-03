@@ -182,3 +182,6 @@ $RECYCLE.BIN/
 
 # ssh
 .ssh/*
+
+# Test Files
+test_files/*

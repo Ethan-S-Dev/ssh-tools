@@ -40,7 +40,7 @@ class Session:
 
     def __del__(self):
         self.ssh_client.close()
-        print("Session closed.")
+        console.print("Session closed.")
 
     def exec_command(self,command:str):
         with self.ssh_client.exec_command(command) as std:
@@ -65,7 +65,7 @@ class Client:
         for key in self.sessions.keys():
             session = self.sessions.pop(key)
             del session
-        print("Deleted all sessions.")
+        console.print("Deleted all sessions.")
 
     def connect(self,session_id:int=None,session_info:SessionInfo=None):
         if session_id is None:

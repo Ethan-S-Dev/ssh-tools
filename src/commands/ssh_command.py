@@ -64,7 +64,7 @@ class SSHCommand():
             if len(args)%2 != 0:
                     raise CommandError("Invalid command args.")        
             for index in range(0,len(args),2):
-                if args[index] in self.argv:
+                if args[index] not in self.argv:
                     raise CommandError(f"Invalid command '{args[index]}'.")
                 self.argv[args[index]](args[index+1])
 
@@ -80,6 +80,10 @@ class SSHCommand():
         while True:
                 try:
                     command = input("$> ")
+                    if command.lower() == "connect":
+                        self.client.connect()
+                        self.client.print_connections()
+                        continue
                     if command.lower() == "exit":
                         break
                     command_list = command.split()
