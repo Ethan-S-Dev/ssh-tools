@@ -43,7 +43,7 @@ class SSHCommand():
             raise CommandError(f"Server connection: '{ip_port}' is invalid.")
         return SessionInfo(ip,port,username,password,command)
 
-    def __exec(self,command:str=None,*session_ids):
+    def __exec(self,command:str=None,*session_ids):  
         return self.client.exec_command(command,list(session_ids))
 
     def __get_result_table(self,index:int):
@@ -99,7 +99,7 @@ class SSHCommand():
                         self.next_id += 1
                         self.client.print_connections()
                         continue
-                    if isinstance(result,dict[int,CommandResult]):
+                    if isinstance(result,dict):
                         self.client.print_results()
                         self.exec_results.append(result)
                         continue

@@ -7,8 +7,8 @@ from util import ConnectionError
 class CommandResult:
     def __init__(self,stdin:str,stdout:str,stderr:str) -> None:
         self.stdin_text = stdin
-        self.stdout_text = stdin
-        self.stderr_text = stdin
+        self.stdout_text = stdout
+        self.stderr_text = stderr
 
 class SessionInfo:
     def __init__(self,ip:str,port:int,username,password:str=None,command:str=None) -> None:
@@ -28,7 +28,7 @@ class Session:
         if self.auto_add_policy:
             self.ssh_client.set_missing_host_key_policy(AutoAddPolicy())
         try:
-            self.ssh_client.connect(ip,port,user,password)
+            self.ssh_client.connect(hostname=ip,port=port,username=user,password=password)
         except BadHostKeyException:
             raise ConnectionError("Invalid host key.")
         except AuthenticationException:
@@ -43,27 +43,40 @@ class Session:
         console.print("Session closed.")
 
     def exec_command(self,command:str):
-        with self.ssh_client.exec_command(command) as std:
-            return CommandResult(std[0].read(),std[1].read(),std[2].read())
+        try:
+            stdin,stdout,stderr = self.ssh_client.exec_command(command)
+            inp = command
+            oup = stdout.read().decode()
+            err = stderr.read().decode()
+            return CommandResult(inp,oup,err)
+        except Exception as err:
+            inp = command
+            oup= "none"
+            err = err
+            return CommandResult(inp,oup,err)
 
 class Client:
     def __init__(self,connections:list[SessionInfo]) -> None:
         self.connections = {i:connections[i] for i in range(len(connections))}
         self.sessions = dict[int,Session]()
 
-        self.connection_table = Table("SHH Connections")
+        self.connection_table = Table()
+        self.connection_table.title = "SSH Connections"
+        self.connection_table.add_column("id")
         self.connection_table.add_column("Server",style="cyan")
         self.connection_table.add_column("Status")
         self.connection_table.add_column("Message")
 
-        self.results_table = Table("SHH Results")
-        self.connection_table.add_column("Server",style="cyan")
-        self.connection_table.add_column("Status")
-        self.connection_table.add_column("Message")
+        self.results_table = Table()
+        self.results_table.title = "SHH Results"
+        self.results_table.add_column("id")
+        self.results_table.add_column("Server",style="cyan")
+        self.results_table.add_column("Status")
+        self.results_table.add_column("Message")
     
     def __del__(self):
         for key in self.sessions.keys():
-            session = self.sessions.pop(key)
+            session = self.sessions.get(key)
             del session
         console.print("Deleted all sessions.")
 
@@ -74,9 +87,9 @@ class Client:
                 try:
                     session = Session(con_info.server_ip,con_info.server_port,con_info.username,con_info.password)
                     self.sessions[con_id] = session
-                    self.connection_table.add_row(f"{con_info.server_ip}:{con_info.server_port}",f"[green]success[/]","Connected Successfully!")
+                    self.connection_table.add_row(str(con_id),f"{con_info.server_ip}:{con_info.server_port}",f"[green]success[/]","Connected Successfully!")
                 except ConnectionError as err:
-                    self.connection_table.add_row(f"{con_info.server_ip}:{con_info.server_port}",f"[red]failed[/]",err.message)
+                    self.connection_table.add_row(str(con_id),f"{con_info.server_ip}:{con_info.server_port}",f"[red]failed[/]",err.message)
             return
 
         if session_info is None:
@@ -84,9 +97,9 @@ class Client:
         try:
             session = Session(session_info.server_ip,session_info.server_port,session_info.username,session_info.password)
             self.sessions[session_id] = session
-            self.connection_table.add_row(f"{session_info.server_ip}:{session_info.server_port}",f"[green]success[/]","Connected Successfully!")
+            self.connection_table.add_row(str(session_id),f"{session_info.server_ip}:{session_info.server_port}",f"[green]success[/]","Connected Successfully!")
         except ConnectionError as err:
-            self.connection_table.add_row(f"{session_info.server_ip}:{session_info.server_port}",f"[red]failed[/]",err.message)
+            self.connection_table.add_row(str(session_id),f"{session_info.server_ip}:{session_info.server_port}",f"[red]failed[/]",err.message)
     
     def disconnect(self,session_id:int=None):
         if session_id is None:
@@ -103,14 +116,21 @@ class Client:
     def exec_command(self,command:str=None,session_ids:list[int]=None):
         self.results_table.rows.clear()
         if session_ids is None or len(session_ids) == 0:
-            session_ids = self.sessions.keys()
+            session_ids = list(self.sessions.keys())
         if command is None:
-            results = {session_id:session.exec_command(self.connections[session_id].command) for session_id,session in self.sessions.items() if session_id in session_ids and self.connections[session_id].command is not None}
+            session_to_exec = {session_id:session for session_id,session in self.sessions.items() if session_id in session_ids and self.connections[session_id].command is not None}
+            results = dict[int,CommandResult]()
+            for session_id,session in session_to_exec.items():
+                command = self.connections[session_id].command
+                results[session_id] = session.exec_command(command)          
         else:
-            results = {session_id:session.exec_command(command) for session_id,session in self.sessions.items() if session_id in session_ids}
+            session_to_exec = {session_id:session for session_id,session in self.sessions.items() if session_id in session_ids}
+            results = dict[int,CommandResult]()
+            for session_id,session in session_to_exec.items():
+                results[session_ids] = session.exec_command(command)
         for id,result in results.items():
             session_info = self.connections.get(id) 
-            self.results_table.add_row(f"{session_info.server_ip}:{session_info.server_port}","[green]Completed[/]" if len(result.stderr_text) == 0 else "[red]Error[/]",f"{result.stdout_text}" if len(result.stderr_text) == 0 else f"{result.stderr_text}")
+            self.results_table.add_row(str(id),f"{session_info.server_ip}:{session_info.server_port}","[green]Completed[/]" if len(result.stderr_text) == 0 else "[red]Error[/]",f"{result.stdout_text}" if len(result.stderr_text) == 0 else f"{result.stderr_text}")
         return results
     
     def print_connections(self):
