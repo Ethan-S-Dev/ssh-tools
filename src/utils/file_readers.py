@@ -1,9 +1,10 @@
+import argparse
 from typing import Union,Callable
-from .exceptions import FileError
 import mimetypes
 import os
 import os.path as path
 import pandas as pd
+
 
 def read_excel(file_path:str,sheet_name:Union[int,str]=0)->list:
     df = pd.read_excel(file_path,sheet_name)
@@ -31,9 +32,28 @@ def read_file(file_path:str):
     exist = path.exists(file_path)
     if exist:
             file_mime = mimetypes.guess_type(file_path,True)[0]
-            if file_mime not in mimes:
-                raise FileError(f"The file: '{file_path}' is not supported.")
             conn_list = mimes[file_mime](file_path)
-            dic = {"ip":"asdas","port":4}
             values_list = [[value for value in item.values()] for item in conn_list]
             return values_list
+
+class ValidateFileAction(argparse.Action):
+    mimes:list[str] = [
+    "application/json",
+    "text/csv",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    ]
+    def __init__(self, option_strings, dest, nargs=None, **kwargs):
+        if nargs is not None:
+            raise ValueError("nargs not allowed")
+        super().__init__(option_strings, dest, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        if values is None:
+            setattr(namespace, self.dest, values)
+            return
+        path = str(values)
+        file_mime = mimetypes.guess_type(path,True)[0]
+        if file_mime not in self.mimes:
+            raise ValueError("file must be csv, xl or json file.")
+        setattr(namespace, self.dest, values)

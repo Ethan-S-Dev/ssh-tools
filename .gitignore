@@ -181,7 +181,7 @@ $RECYCLE.BIN/
 *.lnk
 
 # ssh
-.ssh/*
+old-src/*
 
 # Test Files
-test_files/*
+testf/*
