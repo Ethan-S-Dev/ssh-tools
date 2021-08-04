@@ -81,7 +81,7 @@ class SSHService:
         for id,result in results.items():
             session_info = self.connections.get(id)
             row_input = [str(id),f"{session_info.server_ip}:{session_info.server_port}",style("success",fg='green') if len(result.stderr_text) == 0 else style("failed",fc='red'),f"{result.stdout_text}" if len(result.stderr_text) == 0 else f"{result.stderr_text}"]
-            self._set_table_width(self.connection_table,row_input)
+            self._set_table_width(self.results_table,row_input)
             self.results_table_rows.append(row_input)
         return results
     

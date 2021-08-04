@@ -1,6 +1,7 @@
 import cmd2
 import pathlib
 from services import SSHService
+from configuration import config
 from models import SessionInfo
 from utils import ValidateFileAction,read_file
 
@@ -8,6 +9,7 @@ class SSHToolsApp(cmd2.Cmd):
     
     def __init__(self):
         super().__init__()
+        config(self)
         self.prompt = "$> "
 
     ssh_parser = cmd2.Cmd2ArgumentParser()
