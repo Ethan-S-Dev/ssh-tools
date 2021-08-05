@@ -1,3 +1,4 @@
+from os import path
 import cmd2
 import pathlib
 from services import SSHService
@@ -8,7 +9,12 @@ from utils import ValidateFileAction,read_file
 class SSHToolsApp(cmd2.Cmd):
     
     def __init__(self):
-        super().__init__()
+        super().__init__(allow_cli_args=False)
+        self.app_path = path.dirname(path.dirname(path.dirname(path.abspath(__file__))))
+        self.use_sys_host_key = False
+        self.auto_add_policy = False
+        self.add_settable(cmd2.Settable('use_sys_host_key', bool, 'If True uses system host keys', self))
+        self.add_settable(cmd2.Settable('auto_add_policy', bool, 'If True uses AutoAddPolicy for shh connections', self))
         config(self)
         self.prompt = "$> "
 

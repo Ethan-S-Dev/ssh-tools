@@ -5,14 +5,12 @@ from models import CommandResult
 from utils import ConnectionError
 
 class Session:
-    use_sys_host_key = False
-    auto_add_policy = False
     def __init__(self,app,ip:str,port:int,user:str,password:str=None) -> None:
         self.ssh_client = SSHClient()
         self.app = app
-        if self.use_sys_host_key:
+        if app.use_sys_host_key:
             self.ssh_client.load_system_host_keys()
-        if self.auto_add_policy:
+        if app.auto_add_policy:
             self.ssh_client.set_missing_host_key_policy(AutoAddPolicy())
         try:
             self.ssh_client.connect(hostname=ip,port=port,username=user,password=password)
