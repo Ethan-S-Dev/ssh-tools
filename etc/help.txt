@@ -1,5 +1,0 @@
-usage: ssht [--help] <command> [<args>]
-
-These are common SSH_Tools commands used in various situations:
-
-    ssh             Opens an ssh connection or connections to remote distentions.
