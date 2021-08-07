@@ -1,56 +1,44 @@
+from typing import Callable, Union
 from cmd2.ansi import style
-from models import SessionInfo,CommandResult
-from utils import ConnectionError
+from models import SessionInfo,CommandResult,ConnectionResult
+from utils import ConnectionError,ConnectionResult
 from .session import Session
-from cmd2.table_creator import BorderedTable,Column
+from concurrent.futures import ThreadPoolExecutor
 
 class SSHService:
-    def __init__(self,connections:list[SessionInfo],app) -> None:
-        self.connections = {i:connections[i] for i in range(len(connections))}
-        self.sessions = dict[int,Session]()
-        self.app = app
-        self.connection_table = BorderedTable([Column("id"),Column(style("Server",fg="cyan")),Column("Status"),Column("Message")])
-        self.connection_table_rows =[]
-        self.results_table = BorderedTable([Column("id"),Column(style("Server",fg="cyan")),Column("Status"),Column("Message")])
-        self.results_table_rows =[]
+    def __init__(self) -> None:
+        self.sessions = dict[str,Session]()
+        self.conn_results = list[ConnectionResult]()
+        self.exec_results = list[CommandResult]()
+        #self.connection_table = BorderedTable([Column("id"),Column(style("Server",fg="cyan")),Column("Status"),Column("Message")])
+        #self.results_table = BorderedTable([Column("id"),Column(style("Server",fg="cyan")),Column("Status"),Column("Message")])
     
-    def __del__(self):
-        print = (len(self.sessions.values()) > 0)
-        for key in self.sessions.keys():
-            session = self.sessions.get(key)
-            del session
-        if print:
-            self.app.print("Deleted all sessions.")
+    def load_sys_host_key(self):
+        for session in self.sessions.values():
+            session.load_sys_host_key()
+    
+    def use_auto_add_policy(self):
+        for session in self.sessions.values():
+            session.use_auto_add_policy()
 
-    def connect(self,session_id:int=None,session_info:SessionInfo=None):
+    def add(self,session_info:SessionInfo):
+        id = f"{session_info.server_ip}:{session_info.server_port}"
+        self.sessions[id] = Session(session_info)
+
+    def connect(self,session_id:Union[str,list[str]]=None,callback:Callable=None):
         if session_id is None:
-            self.connection_table_rows.clear()   
-            for con_id,con_info in self.connections.items():
-                try:
-                    session = Session(self.app,con_info.server_ip,con_info.server_port,con_info.username,con_info.password)
-                    self.sessions[con_id] = session
-                    row_input = [str(con_id),f"{con_info.server_ip}:{con_info.server_port}",style("success",fg='green'),"Connected Successfully!"]
-                    self._set_table_width(self.connection_table,row_input)
-                    self.connection_table_rows.append(row_input)
-                except ConnectionError as err:
-                    row_input = [str(con_id),f"{con_info.server_ip}:{con_info.server_port}",style("failed",fg='red'),err.message]
-                    self._set_table_width(self.connection_table,row_input)
-                    self.connection_table_rows.append(row_input)
-            return
+            sessions_to_connect = [(s,callback) for s in self.sessions.values() if not s.is_connected]
+            with ThreadPoolExecutor() as executer:
+                results = executer.map(self.__connect,sessions_to_connect)
+                self.conn_results.append(results)
+        if isinstance()
 
-        if session_info is None:
-            session_info = self.connections[session_id]
-        try:
-            session = Session(self.app,session_info.server_ip,session_info.server_port,session_info.username,session_info.password)
-            self.sessions[session_id] = session
-            row_input = [str(session_id),f"{session_info.server_ip}:{session_info.server_port}",style("success",fg='green'),"Connected Successfully!"]
-            self._set_table_width(self.connection_table,row_input)
-            self.connection_table_rows.append(row_input)
-        except ConnectionError as err:
-            row_input = [str(session_id),f"{session_info.server_ip}:{session_info.server_port}",style("failed",fg='red'),err.message]
-            self._set_table_width(self.connection_table,row_input)
-            self.connection_table_rows.append(row_input)
-    
+    def __connect(self,session:Session,callback:Callable=None):
+        result = session.connect()
+        if callback:
+            callback()
+        return result
+
     def disconnect(self,session_id:int=None):
         if session_id is None:
             for session_id,session in self.sessions.items():
@@ -84,17 +72,19 @@ class SSHService:
             self._set_table_width(self.results_table,row_input)
             self.results_table_rows.append(row_input)
         return results
-    
-    def print_connections(self):
-        self.app.print(self.connection_table.generate_table(self.connection_table_rows))
-    
-    def print_results(self):
-        self.app.print(self.results_table.generate_table(self.results_table_rows))
 
-    def _set_table_width(self,table,input):
-        for i in range(len(input)):
-            if len(input[i]) > table.cols[i].width:
-                if len(input[i]) > 50:
-                    table.cols[i].width = 50
-                else:
-                    table.cols[i].width = len(input[i])
+#    def _set_table_width(self,table,input):
+#       for i in range(len(input)):
+#            if len(input[i]) > table.cols[i].width:
+#                if len(input[i]) > 50:
+#                    table.cols[i].width = 50
+#                else:
+#                    table.cols[i].width = len(input[i])
+
+    def __del__(self):
+        print = (len(self.sessions.values()) > 0)
+        for key in self.sessions.keys():
+            session = self.sessions.get(key)
+            del session
+        if print:
+            self.app.print("Deleted all sessions.")
