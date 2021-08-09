@@ -1,6 +1,5 @@
 import threading
 from typing import Callable
-from cmd2.ansi import style
 from sshtools.models import SessionInfo,CommandResult,ConnectionResult,Policy, policy
 from .session import Session
 from concurrent.futures import ThreadPoolExecutor
@@ -52,16 +51,21 @@ class SSHService:
         if self.auto_load_sys_host_key:
             self.sessions[id].load_sys_host_key()
     
-    def remove(self,session_id:str):
-        session = self.sessions.pop(session_id)
-        if session and session.is_connected:
-            session.disconnect()
+    def remove(self,session_ids:list[str]=None):
+        if session_ids is None or not len(session_ids):
+            sessions_ids = [key for key in self.sessions.keys()]
+        else:
+            sessions_ids = [key for key in self.sessions.keys() if key in session_ids]
+        for session_id in sessions_ids:
+            session = self.sessions.pop(session_id)
+            if session and session.is_connected():
+                session.disconnect()
 
     def connect(self,session_ids:list[str]=None,callback:Callable=None):
         if session_ids is None or not len(session_ids):
-            sessions_to_connect = [s for s in self.sessions.values() if not s.is_connected]
+            sessions_to_connect = [s for s in self.sessions.values() if not s.is_connected()]
         else:
-            sessions_to_connect = [self.sessions[id] for id in session_ids]
+            sessions_to_connect = [sess for key,sess in self.sessions.items() if key in session_ids and not sess.is_connected()]
         number_of_sessions = len(sessions_to_connect)
         sessions_args_list = ((s,number_of_sessions,callback) for s in sessions_to_connect)
         with ThreadPoolExecutor() as executer:
@@ -69,7 +73,6 @@ class SSHService:
         return results
 
     def __connect(self,session:Session,nsessions:int,callback:Callable=None):
-        #print(f'conn {session.id}')
         result = session.connect()
         self.lock.acquire()
         self.conn_results[result.session_id] = result
@@ -81,20 +84,23 @@ class SSHService:
 
     def disconnect(self,session_ids:list[str]=None):
         if session_ids is None or not len(session_ids):
-            sessions_to_disconnect = self.sessions.values()
+            sessions_to_disconnect = [sess for sess in self.sessions.values() if sess.is_connected()]
         else:
-            sessions_to_disconnect = [self.sessions[id] for id in session_ids]
+            sessions_to_disconnect = [sess for key,sess in self.sessions.items() if sess.is_connected() and key in session_ids]
+        keys = [sess.id for sess in sessions_to_disconnect]
         for session in sessions_to_disconnect:
             session.disconnect()
-            self.conn_results[session.id].status = style('disconnected',fg="lightgray")     
+            self.conn_results[session.id].status = 'disconnected' 
+            self.conn_results[session.id].message = 'session was disconnected.'
+        return [res for key,res in self.conn_results.items() if key in keys]
            
     def exec_command(self,command:str=None,session_ids:list[str]=None,callback:Callable=None):
         exec_id = self.execution_id
         self.execution_id += 1
         if session_ids is None or not len(session_ids):
-            sessions_to_work = [s for s in self.sessions.values() if s.is_connected]
+            sessions_to_work = [s for s in self.sessions.values() if s.is_connected()]
         else:
-            sessions_to_work = [self.sessions[id] for id in session_ids if self.sessions[id] and self.sessions[id].is_connected]
+            sessions_to_work = [sess for key,sess in self.sessions.items() if key in session_ids and sess.is_connected()]
         if command is None:
             sessions_to_exec = [[s,exec_id,s.default_command,callback] for s in sessions_to_work if s.default_command]
         else:
@@ -106,6 +112,12 @@ class SSHService:
             self.exec_results.extend(results)
         return results
 
+    def update_status(self):
+        for sess in self.sessions.values():
+            if not sess.is_connected() and sess.id in self.conn_results.keys():
+                self.conn_results[sess.id].status = 'disconnected' 
+                self.conn_results[sess.id].message = 'session was disconnected.'
+            
     def set_banner_timeout(self,time:int):
         for session in self.sessions.values():
             session.banner_timout = time
@@ -118,5 +130,4 @@ class SSHService:
        
     def __del__(self):
         self.disconnect()
-
-#    
+  
