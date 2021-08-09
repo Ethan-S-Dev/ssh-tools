@@ -10,6 +10,7 @@ from sshtools.services import SSHService
 from sshtools.configuration import config
 from sshtools.models import SessionInfo
 from sshtools.utils import ValidateFileAction,read_file,Password
+from sshtools.utils.connetion_info import ConnectionInfo
 
 class SSHToolsApp(cmd2.Cmd):
     
@@ -32,17 +33,19 @@ class SSHToolsApp(cmd2.Cmd):
     ssh_parser = cmd2.Cmd2ArgumentParser()
     ssh_parser.add_argument('-f','--file',default=None,type=pathlib.Path, action=ValidateFileAction, help='the file to load sessions from')
     ssh_parser.add_argument('-c','--connect',default=False,type=bool, help='if true auto connect session')
-    ssh_parser.add_argument('-i','--ip',default=None,required=False,help="specify ip")
-    ssh_parser.add_argument('-p','--port',default=None,required=False,help="specify port")
-    ssh_parser.add_argument('-u','--username',default=None,required=False,help="specify username")
-    ssh_parser.add_argument('-ps','--password',default=None,required=False,type=Password,help="specify password")
-    ssh_parser.add_argument('-dc','--dcommand',default=None,required=False,help="specify default command")
+    ssh_parser.add_argument('-i','--info',required=False,type=ConnectionInfo,help="specify connection info")
+    ssh_parser.add_argument('-p','--port',required=False,help="specify port")
+    ssh_parser.add_argument('-cm','-dcommand',default=None,help="specify the default command")
     @cmd2.with_argparser(ssh_parser)
     def do_add(self, args):
         """starts an ssh service"""
-        if args.file is None and args.ip is None and args.port is None and args.username is None and args.password is None:
+        if args.file is None and args.info is None:
             self.ssh_parser.print_usage()
-            self.print(style("Error: one of the following arguments is required: file, connection info",fg="red"))
+            self.print(style("Error: one of the following arguments is required: file, info",fg="red"))
+            return
+        if args.file is not None and args.info is not None:
+            self.ssh_parser.print_usage()
+            self.print(style("Error: only one of those argument can be provided: file, info",fg="red"))
             return
         if args.file:
             conn_list = read_file(str(args.file))
@@ -55,8 +58,10 @@ class SSHToolsApp(cmd2.Cmd):
             except Exception as err:
                 pass
         else:
-            try:              
-                session_info = SessionInfo(args.ip,args.port,args.username,args.password.value,args.dcommand)
+            try:
+                if args.port:
+                    args.info.port = args.port
+                session_info = SessionInfo(args.info.ip,args.info.port,args.info.username,args.info.password.value,args.dcommand)
                 self.ssh_service.add(session_info)
                 if args.connect:
                         self.ssh_service.connect(f"{session_info.server_ip}:{session_info.server_port}")
