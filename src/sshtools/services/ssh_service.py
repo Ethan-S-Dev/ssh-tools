@@ -56,10 +56,12 @@ class SSHService:
             sessions_ids = [key for key in self.sessions.keys()]
         else:
             sessions_ids = [key for key in self.sessions.keys() if key in session_ids]
+        results = list[ConnectionResult]()
+        self.disconnect(sessions_ids)
         for session_id in sessions_ids:
-            session = self.sessions.pop(session_id)
-            if session and session.is_connected():
-                session.disconnect()
+            self.sessions.pop(session_id)
+            results.append(self.conn_results.pop(session_id))
+        return results
 
     def connect(self,session_ids:list[str]=None,callback:Callable=None):
         if session_ids is None or not len(session_ids):

@@ -1,3 +1,4 @@
+from argparse import ArgumentError, ArgumentTypeError
 from os import path
 from tqdm import tqdm
 import cmd2
@@ -5,7 +6,7 @@ import pathlib
 from cmd2.table_creator import BorderedTable,Column
 from cmd2.ansi import style,strip_style
 from time import time
-from sshtools.services import SSHService, ssh_service
+from sshtools.services import SSHService
 from sshtools.configuration import config
 from sshtools.models import SessionInfo
 from sshtools.utils import ValidateFileAction,read_file,Password
@@ -38,7 +39,11 @@ class SSHToolsApp(cmd2.Cmd):
     ssh_parser.add_argument('-dc','--dcommand',default=None,required=False,help="specify default command")
     @cmd2.with_argparser(ssh_parser)
     def do_add(self, args):
-        """starts an ssh service""" 
+        """starts an ssh service"""
+        if args.file is None and args.ip is None and args.port is None and args.username is None and args.password is None:
+            self.ssh_parser.print_usage()
+            self.print(style("Error: one of the following arguments is required: file, connection info",fg="red"))
+            return
         if args.file:
             conn_list = read_file(str(args.file))
             try:
@@ -63,6 +68,13 @@ class SSHToolsApp(cmd2.Cmd):
     @cmd2.with_argparser(ssh_connect_parser)
     def do_connect(self,args):
         '''connects to the ssh sessions in the service'''
+        if args.list is None or len(args.list):
+            to_connect = [key for key,sess in self.ssh_service.sessions.items() if not sess.is_connected()]
+        else:
+            to_connect = [key for key,sess in self.ssh_service.sessions.items() if not sess.is_connected() and key in args.list]
+        if not len(to_connect):
+            self.print(style("no sessions to connect.",fg='yellow'))
+            return
         with tqdm(total=100) as pbar:
             pbar.set_lock(self.ssh_service.lock)
             start = time()
@@ -85,13 +97,21 @@ class SSHToolsApp(cmd2.Cmd):
     
     ssh_exec_parser = cmd2.Cmd2ArgumentParser()
     ssh_exec_parser.add_argument('-cm','--command',default=None,required=False,help="specify command to execute")
+    ssh_exec_parser.add_argument('-l','--list',nargs='+',help='list of sessions to execute on.')
     @cmd2.with_argparser(ssh_exec_parser)
     def do_exec(self,args):
         '''execute command on the ssh sessions'''
+        if args.list is None or not len(args.list):
+            execut_on = [key for key,sess in self.ssh_service.sessions.items() if sess.is_connected()]
+        else:
+            execut_on = [key for key,sess in self.ssh_service.sessions.items() if sess.is_connected() and key in args.list]
+        if not len(execut_on):
+            self.print(style("no sessions to execute on. consider adding or connecting sessions.",fg='yellow'))
+            return
         with tqdm(total=100) as pbar:
             pbar.set_lock(self.ssh_service.lock)
             start = time()
-            results = self.ssh_service.exec_command(args.command,callback=pbar.update)
+            results = self.ssh_service.exec_command(args.command,execut_on,callback=pbar.update)
             end = time()
         table_data = [[result.session_id,style('failed',fg='red') if result.stderr_text else style('success',fg='green'),result.stderr_text if result.stderr_text else result.stdout_text,result.execution_time] for result in results]
         self.__set_table_width(self.result_table,table_data)
@@ -103,21 +123,37 @@ class SSHToolsApp(cmd2.Cmd):
     @cmd2.with_argparser(ssh_remove_parser)
     def do_remove(self,args):
         '''removes the ssh session(s) from the service'''      
-        self.ssh_service.remove(args.list)
-        self.print('sessions removed successfully.')
+        results = self.ssh_service.remove(args.list)
+        if not len(results):
+            self.print(style("didn't find any session to remove.",fg='yellow'))
+            return
+        conn_data = [[row.session_id,style(row.status,fg='green') if row.status == 'success' else style(row.status,fg='red') if row.status == 'failure' else style(row.status,fg='bright_black'),row.message,row.connection_time]for row in results]
+        title = f"Removed {len(results)} sessions:"
+        self.print(style(title,fg="cyan"))
+        self.print('='*len(title))
+        self.__set_table_width(self.conn_table,conn_data)
+        self.print(self.conn_table.generate_table(conn_data))
     
     ssh_show_parser = cmd2.Cmd2ArgumentParser()
-    ssh_show_parser.add_argument('-c','--conns',nargs='*',help='id of the session to show the connection data of.')
+    ssh_show_parser.add_argument('-c','--connections',nargs='*',help='id of the session to show the connection data of.')
     ssh_show_parser.add_argument('-s','--sessions',nargs='*',help='id of the sessions to show.')
-    ssh_show_parser.add_argument('-e','--execs',type=int,nargs='*',help='id of the exec to show.')
+    ssh_show_parser.add_argument('-e','--executions',type=int,nargs='*',help='id of the exec to show.')
     @cmd2.with_argparser(ssh_show_parser)
     def do_show(self,args):
         self.ssh_service.update_status()
-        if args.execs is not None:
+
+        if args.executions is None and args.connections is None and args.sessions is None:
+            self.ssh_show_parser.print_usage()
+            self.print(style("Error: one of the following arguments is required: connections, sessions or executions",fg="red"))
+            return
+
+        if args.executions is not None:
             ids = set([ex.exec_id for ex in self.ssh_service.exec_results])
-            if not len(args.execs):
-                args.execs = ids
-            for exe_id in args.execs:
+            if not len(ids):
+                self.print(style("no executions to show.",fg='yellow'))
+            if not len(args.executions):
+                args.executions = ids  
+            for exe_id in args.executions:
                 if exe_id in ids:
                     title = f"Execution: #{exe_id}"
                     self.print(style(title,fg="cyan"))
@@ -127,11 +163,14 @@ class SSHToolsApp(cmd2.Cmd):
                     self.__set_table_width(self.result_table,exec_data)
                     self.print(self.result_table.generate_table(exec_data))
         
-        if args.conns is not None:
-            if len(args.conns):
-                conn_to_show =  [con for key,con in self.ssh_service.conn_results.items() if key in args.conns]
+        if args.connections is not None:
+            if len(args.connections):
+                conn_to_show =  [con for key,con in self.ssh_service.conn_results.items() if key in args.connections]
             else:
                 conn_to_show = self.ssh_service.conn_results.values()
+            if not len(conn_to_show):
+                self.print(style("no connections to show.",fg='yellow'))
+                return
             conn_data = [[row.session_id,style(row.status,fg='green') if row.status == 'success' else style(row.status,fg='red') if row.status == 'failure' else style(row.status,fg='bright_black'),row.message,row.connection_time]for row in conn_to_show]
             self.__set_table_width(self.conn_table,conn_data)
             self.print(self.conn_table.generate_table(conn_data))
@@ -141,6 +180,9 @@ class SSHToolsApp(cmd2.Cmd):
                 sessions_to_show =  [ses for key,ses in self.ssh_service.sessions.items() if key in args.sessions]
             else:
                 sessions_to_show = self.ssh_service.sessions.values()
+            if not len(sessions_to_show):
+                self.print(style("no sessions to show.",fg='yellow'))
+                return
             for session in sessions_to_show:
                 title = f"Session: {session.id}"
                 self.print(style(title,fg="cyan"))
