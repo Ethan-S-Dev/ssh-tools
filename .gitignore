@@ -185,3 +185,5 @@ old-src/*
 
 # Test Files
 testf/*
+scripts/*
+

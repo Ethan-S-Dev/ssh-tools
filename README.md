@@ -1,2 +1,2 @@
 # SSH-Tools
-## A cli program to inteface easily with servers via ssh
+## A cli program to interface easily with servers via ssh
