@@ -7,4 +7,3 @@ class CommandResult:
         self.stdin_text = stdin
         self.stdout_text = stdout
         self.stderr_text = stderr
-
